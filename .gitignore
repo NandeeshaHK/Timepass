@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Local raw stories (NEVER COMMIT RAW MARKDOWN)
+stories_raw/
+
+# Environment files and passphrases
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

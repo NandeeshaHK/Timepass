@@ -1,0 +1,58 @@
+:root {
+  /* Light Sepia Theme (Warm Parchment / Espresso) */
+  --bg-color-light: #F4EFE6;
+  --bg-card-light: #ECE5DA;
+  --text-main-light: #3E2723;
+  --text-muted-light: #6D4C41;
+  --border-color-light: #D7CCC8;
+  --accent-color-light: #8D6E63;
+  --hud-bg-light: rgba(244, 239, 230, 0.95);
+
+  /* Dark Mocha Theme (Deep Mocha / Latte) */
+  --bg-color-dark: #231B18;
+  --bg-card-dark: #2E2420;
+  --text-main-dark: #EADCD3;
+  --text-muted-dark: #BCAAA4;
+  --border-color-dark: #4E342E;
+  --accent-color-dark: #A1887F;
+  --hud-bg-dark: rgba(35, 27, 24, 0.95);
+
+  /* Default active variables (mapped dynamically by data-theme) */
+  --bg-color: var(--bg-color-light);
+  --bg-card: var(--bg-card-light);
+  --text-main: var(--text-main-light);
+  --text-muted: var(--text-muted-light);
+  --border-color: var(--border-color-light);
+  --accent-color: var(--accent-color-light);
+  --hud-bg: var(--hud-bg-light);
+
+  /* Typography scale */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Merriweather", "Georgia", "Cambria", serif;
+  
+  --font-size-sm: 1.1rem;   /* 17.6px */
+  --font-size-md: 1.35rem;  /* 21.6px - Default elder-friendly */
+  --font-size-lg: 1.65rem;  /* 26.4px */
+  --font-size-xl: 2.0rem;   /* 32px */
+  --font-size-xxl: 2.4rem;  /* 38.4px */
+
+  --font-size-current: var(--font-size-md);
+  --line-height: 1.65;
+  --letter-spacing: 0.015em;
+
+  /* Safe Area Insets for modern devices with notches/bars */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+[data-theme="dark"] {
+  --bg-color: var(--bg-color-dark);
+  --bg-card: var(--bg-card-dark);
+  --text-main: var(--text-main-dark);
+  --text-muted: var(--text-muted-dark);
+  --border-color: var(--border-color-dark);
+  --accent-color: var(--accent-color-dark);
+  --hud-bg: var(--hud-bg-dark);
+}

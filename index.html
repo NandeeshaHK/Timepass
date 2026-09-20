@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Timepass Tea</title>
+  
+  <meta name="description" content="Distraction-free, accessible story reader designed for comfortable reading." />
+  <meta name="theme-color" content="#F4EFE6" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="favicon.ico" />
+
+  <link rel="stylesheet" href="./src/assets/styles/main.css" />
+  <link rel="stylesheet" href="./src/assets/styles/reader.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- View 1: Library View -->
+    <main id="view-library" class="view active">
+      <div class="library-container">
+        <header class="library-header">
+          <h1 class="library-title">Timepass Tea</h1>
+          <div class="library-actions">
+            <button id="btn-toggle-theme" aria-label="Toggle Theme">
+              <i id="icon-theme" data-lucide="moon"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- Continue Reading Card Section -->
+        <section id="continue-section"></section>
+
+        <!-- Story Catalog Grid -->
+        <section id="story-list" class="story-list"></section>
+      </div>
+    </main>
+
+    <!-- View 2: Reader View -->
+    <section id="view-reader" class="reader-view">
+      <!-- 3-Container Virtual Carousel -->
+      <div id="carousel-viewport" class="carousel-viewport"></div>
+
+      <!-- Left / Center / Right Tap Interaction Zones -->
+      <div id="tap-left" class="tap-zone-left" aria-label="Previous Page"></div>
+      <div id="tap-center" class="tap-zone-center" aria-label="Toggle Controls"></div>
+      <div id="tap-right" class="tap-zone-right" aria-label="Next Page"></div>
+
+      <!-- Distraction-Free HUD Overlay (Auto-hidden) -->
+      <div id="hud-container">
+        <!-- Top HUD Header -->
+        <header class="hud-top">
+          <div class="hud-header-content">
+            <button id="btn-back-to-library" aria-label="Back to Library">
+              <i data-lucide="arrow-left"></i>
+              <span>Library</span>
+            </button>
+            <div id="story-header-title" class="story-header-title">Story Title</div>
+            <div class="hud-controls-group">
+              <button id="btn-open-toc" aria-label="Table of Contents">
+                <i data-lucide="list"></i>
+              </button>
+              <button id="btn-font-minus" aria-label="Decrease Font">A-</button>
+              <button id="btn-font-plus" aria-label="Increase Font">A+</button>
+              <button id="btn-reader-theme" aria-label="Toggle Theme">
+                <i data-lucide="sun-medium"></i>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Bottom HUD Progress Bar -->
+        <footer class="hud-bottom">
+          <div class="hud-bottom-content">
+            <div class="progress-info">
+              <span>Progress</span>
+              <span id="page-progress-text">Page 1 of 1</span>
+            </div>
+            <input type="range" id="progress-slider" class="progress-slider" min="0" max="0" value="0" />
+          </div>
+        </footer>
+      </div>
+
+      <!-- Chapter Menu Drawer (ToC) -->
+      <div id="toc-drawer" class="toc-drawer">
+        <aside class="toc-panel">
+          <div class="toc-header">
+            <h3>Chapters</h3>
+            <button id="btn-close-toc" aria-label="Close Chapters">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <ul id="toc-list" class="toc-list"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Passphrase Decryption Modal -->
+    <div id="passphrase-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <h2>Enter Passphrase</h2>
+        <p>This library is encrypted for private reading. Please enter your passphrase to unlock.</p>
+        <input type="password" id="passphrase-input" placeholder="Passphrase..." autocomplete="current-password" />
+        <button id="btn-submit-passphrase" class="btn" style="width:100%;">Unlock Stories</button>
+        <p id="passphrase-error" class="error-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>
