@@ -8,9 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "encrypt": "node scripts/encrypt-stories.js",
-    "build:all": "node scripts/encrypt-stories.js && vite build"
+    "icons": "node scripts/generate-icons.js",
+    "build:all": "node scripts/encrypt-stories.js && node scripts/generate-icons.js && vite build"
   },
   "devDependencies": {
+    "sharp": "^0.35.4",
     "vite": "^5.4.2",
     "vite-plugin-pwa": "^0.20.5"
   },

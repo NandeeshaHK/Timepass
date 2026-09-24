@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
+      includeAssets: ['favicon.ico', 'favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png', 'logo.svg', 'icons/*.png', 'icons/*.svg'],
       manifest: {
         name: 'Timepass Tea - Story Reader',
         short_name: 'TimepassTea',

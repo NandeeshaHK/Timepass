@@ -8,7 +8,10 @@
   <meta name="description" content="Distraction-free, accessible story reader designed for comfortable reading." />
   <meta name="theme-color" content="#F4EFE6" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
 
   <link rel="stylesheet" href="./src/assets/styles/main.css" />
   <link rel="stylesheet" href="./src/assets/styles/reader.css" />
@@ -19,7 +22,10 @@
     <main id="view-library" class="view active">
       <div class="library-container">
         <header class="library-header">
-          <h1 class="library-title">Timepass Tea</h1>
+          <div class="brand-badge">
+            <img src="icons/icon-192x192.png" alt="Timepass Tea Logo" class="brand-icon" width="38" height="38" />
+            <h1 class="library-title">Timepass Tea</h1>
+          </div>
           <div class="library-actions">
             <button id="btn-toggle-theme" aria-label="Toggle Theme">
               <i id="icon-theme" data-lucide="moon"></i>
