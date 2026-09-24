@@ -62,8 +62,8 @@ class App {
 
     this.carousel = new VirtualCarousel({
       viewportEl: /** @type {HTMLElement} */ (document.getElementById('reader-viewport')),
-      frameEl: /** @type {HTMLElement} */ (document.getElementById('reader-frame')),
-      contentEl: /** @type {HTMLElement} */ (document.getElementById('reader-content')),
+      trackEl: /** @type {HTMLElement} */ (document.getElementById('reader-track')),
+      measurerEl: /** @type {HTMLElement} */ (document.getElementById('reader-measurer')),
       toastEl: /** @type {HTMLElement} */ (document.getElementById('reader-toast')),
       fetchAndDecryptChunk: (index) => this.fetchStoryChunk(index),
       onPageChange: (chapterIdx, totalChapters, pageIdx, totalPages) =>

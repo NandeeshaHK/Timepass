@@ -3,32 +3,34 @@ import DOMPurify from 'dompurify';
 import { HapticUX } from '../ui/haptics.js';
 
 /**
- * Dynamic Multi-Column E-Reader Engine with Touch Gestures,
- * Instant Column Pagination (Zero Line Cut-off), Pre-fetching, and Seamless Chapter Transitions.
+ * Single-Page Horizontal Carousel Reader Engine.
+ * Dynamically partitions chapter content into exact-fit non-overflowing pages
+ * measured in the client DOM. Guarantees ZERO line cut-off, NO side-by-side columns,
+ * and buttery-smooth horizontal swipe transitions.
  */
 export class VirtualCarousel {
   /**
    * @param {Object} options
    * @param {HTMLElement} options.viewportEl - Viewport container element.
-   * @param {HTMLElement} options.frameEl - Sized reading frame that clips non-active columns.
-   * @param {HTMLElement} options.contentEl - Inner content element where multi-column CSS flow is applied.
-   * @param {HTMLElement} [options.toastEl] - Toast element for boundary notices.
+   * @param {HTMLElement} options.trackEl - Horizontal sliding track for reader pages.
+   * @param {HTMLElement} options.measurerEl - Off-screen measuring container.
+   * @param {HTMLElement} [options.toastEl] - Toast notification element.
    * @param {(chapterIndex: number) => Promise<string>} options.fetchAndDecryptChunk - Chunk decryptor.
    * @param {(chapterIndex: number, totalChapters: number, pageIndex: number, totalPages: number) => void} options.onPageChange - Progress callback.
-   * @param {() => void} [options.onToggleHUD] - HUD visibility toggle callback.
+   * @param {() => void} [options.onToggleHUD] - HUD toggle callback.
    */
   constructor({
     viewportEl,
-    frameEl,
-    contentEl,
+    trackEl,
+    measurerEl,
     toastEl,
     fetchAndDecryptChunk,
     onPageChange,
     onToggleHUD
   }) {
     this.viewportEl = viewportEl;
-    this.frameEl = frameEl;
-    this.contentEl = contentEl;
+    this.trackEl = trackEl;
+    this.measurerEl = measurerEl;
     this.toastEl = toastEl || document.getElementById('reader-toast');
     this.fetchAndDecryptChunk = fetchAndDecryptChunk;
     this.onPageChange = onPageChange;
@@ -38,9 +40,8 @@ export class VirtualCarousel {
     this.totalChapters = 1;
     this.currentPageIndex = 0;
     this.totalPages = 1;
-    this.pageWidth = 0;
-    this.pageGap = 32;
 
+    this.currentMarkdown = '';
     this.chapterRequestId = 0;
     this.isLoadingChapter = false;
     /** @type {Map<number, string>} */
@@ -48,7 +49,7 @@ export class VirtualCarousel {
     this.toastTimer = null;
 
     this.initGestureEvents();
-    this.initResizeObserver();
+    this.initResizeListener();
   }
 
   /**
@@ -65,7 +66,6 @@ export class VirtualCarousel {
     // 1. Touch Gesture Handling on Viewport
     this.viewportEl.addEventListener('touchstart', (e) => {
       if (e.touches.length !== 1) return;
-      // Do not intercept if touch originated from HUD controls or open drawer
       if (e.target.closest('#hud-container.hud-visible') || e.target.closest('#toc-drawer.open')) {
         return;
       }
@@ -92,7 +92,7 @@ export class VirtualCarousel {
       const distance = Math.hypot(deltaX, deltaY);
       const elapsed = Date.now() - startTime;
 
-      // Check for horizontal swipe gesture (min 35px horizontal, predominantly horizontal, < 600ms)
+      // Horizontal Swipe Gesture Detection
       if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 600) {
         if (deltaX < 0) {
           // Swiped Left -> Next page
@@ -104,7 +104,7 @@ export class VirtualCarousel {
         return;
       }
 
-      // Check for clean Tap gesture (minimal finger movement < 15px, quick tap < 350ms)
+      // Clean Tap Gesture Detection
       if (distance < 15 && elapsed < 350) {
         const screenWidth = window.innerWidth;
         const tapX = startX;
@@ -128,7 +128,6 @@ export class VirtualCarousel {
       if (e.target.closest('#hud-container.hud-visible') || e.target.closest('#toc-drawer.open')) {
         return;
       }
-      // Suppress click immediately following touch end
       if (Date.now() - startTime < 450) return;
 
       const screenWidth = window.innerWidth;
@@ -160,26 +159,16 @@ export class VirtualCarousel {
   }
 
   /**
-   * Monitors container resize (e.g. orientation change or font resize) to reflow columns cleanly.
+   * Monitors viewport resize (orientation change or font size scaling).
    */
-  initResizeObserver() {
+  initResizeListener() {
     let resizeTimer = null;
-    if (window.ResizeObserver) {
-      const ro = new ResizeObserver(() => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          this.recalculatePages(false);
-        }, 60);
-      });
-      ro.observe(this.frameEl);
-    } else {
-      window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          this.recalculatePages(false);
-        }, 60);
-      });
-    }
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        this.recalculatePages(false);
+      }, 100);
+    });
   }
 
   /**
@@ -195,9 +184,9 @@ export class VirtualCarousel {
   }
 
   /**
-   * Loads and displays a chapter, calculating its multi-column layout.
+   * Loads and displays a chapter, paginating its content cleanly into slides.
    * @param {number} chapterIndex
-   * @param {number | 'last'} [targetPage=0] - Page index or 'last' for chapter reverse navigation.
+   * @param {number | 'last'} [targetPage=0]
    * @param {'slide-left' | 'slide-right' | null} [transitionDirection=null]
    * @param {boolean} [force=false]
    */
@@ -209,17 +198,14 @@ export class VirtualCarousel {
     this.isLoadingChapter = true;
     this.currentChapterIndex = chapterIndex;
 
-    // Apply immediate chapter exit transition if requested
+    // Apply chapter transition animation if switching between chapters
     if (transitionDirection) {
-      this.contentEl.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
-      this.contentEl.style.opacity = '0';
-      this.contentEl.style.transform = transitionDirection === 'slide-left'
-        ? `translateX(-${this.pageWidth + this.pageGap}px)`
-        : `translateX(${this.pageWidth + this.pageGap}px)`;
-      await new Promise(r => setTimeout(r, 160));
+      this.trackEl.style.transition = 'opacity 0.16s ease-out';
+      this.trackEl.style.opacity = '0';
+      await new Promise(r => setTimeout(r, 140));
     }
 
-    // Retrieve markdown from cache or fetch & decrypt
+    // Retrieve markdown from memory cache or fetch and decrypt
     let markdown = this.chapterCache.get(chapterIndex);
     if (!markdown) {
       try {
@@ -230,19 +216,13 @@ export class VirtualCarousel {
       }
     }
 
-    // If newer request occurred while awaiting decryption, discard stale result
+    // Discard stale request if user rapidly navigated elsewhere
     if (currentRequestId !== this.chapterRequestId) return;
 
-    // Render markdown cleanly into content element
-    this.contentEl.innerHTML = DOMPurify.sanitize(marked.parse(markdown || ''));
+    this.currentMarkdown = markdown;
 
-    // Reset styles for layout calculation
-    this.contentEl.style.transition = 'none';
-    this.contentEl.style.opacity = '1';
-    this.contentEl.style.transform = 'none';
-
-    // Calculate dynamic multi-column pages based on current font size & viewport dimensions
-    this.recalculatePages(false);
+    // Paginate markdown into non-overflowing DOM slides
+    this.buildPagesFromMarkdown(this.currentMarkdown);
 
     // Determine target page within chapter
     if (targetPage === 'last') {
@@ -252,51 +232,233 @@ export class VirtualCarousel {
     }
 
     this.updateTransform(false);
+    this.trackEl.style.opacity = '1';
     this.isLoadingChapter = false;
     this.notifyProgress();
 
-    // Pre-fetch adjacent chapters in background for instant transitions
+    // Pre-fetch adjacent chapters in background
     this.prefetchAdjacentChapters(chapterIndex);
   }
 
   /**
-   * Recalculates columns and total pages dynamically without losing text or clipping lines.
+   * Paginates chapter markdown into non-overflowing page slides.
+   * Measures content height accurately in client DOM so NO text is ever clipped.
+   * @param {string} markdown
+   */
+  buildPagesFromMarkdown(markdown) {
+    const rawHtml = DOMPurify.sanitize(marked.parse(markdown || ''));
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = rawHtml;
+    const blockElements = Array.from(tempDiv.children);
+
+    const viewportHeight = this.viewportEl.clientHeight || window.innerHeight;
+    const viewportWidth = Math.min(this.viewportEl.clientWidth || window.innerWidth, 680);
+
+    // Subtract generous padding & safe areas so text has breathing room and NEVER touches edges
+    const safeAvailableHeight = Math.max(260, viewportHeight - 110);
+    this.measurerEl.style.width = `${Math.max(260, viewportWidth - 44)}px`;
+
+    const pages = [];
+    let currentPageNodes = [];
+    this.measurerEl.innerHTML = '';
+
+    for (const child of blockElements) {
+      const node = child.cloneNode(true);
+      this.measurerEl.appendChild(node);
+
+      if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+        // Fits entirely on current page
+        currentPageNodes.push(node.cloneNode(true));
+      } else {
+        // Exceeds available height
+        this.measurerEl.removeChild(node);
+
+        if (node.tagName === 'P') {
+          const words = node.textContent.trim().split(/\s+/).filter(Boolean);
+          let low = 1;
+          let high = words.length;
+          let bestWords = 0;
+
+          const testP = document.createElement('p');
+          if (currentPageNodes.length > 0) testP.className = 'continuation';
+          this.measurerEl.appendChild(testP);
+
+          // Binary search for exact number of words that fit remaining vertical space
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            testP.textContent = words.slice(0, mid).join(' ');
+            if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+              bestWords = mid;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+
+          this.measurerEl.removeChild(testP);
+
+          if (bestWords >= 8 && currentPageNodes.length > 0) {
+            // First slice fits on current page
+            const fitP = document.createElement('p');
+            fitP.textContent = words.slice(0, bestWords).join(' ');
+            currentPageNodes.push(fitP);
+
+            pages.push(currentPageNodes);
+            currentPageNodes = [];
+            this.measurerEl.innerHTML = '';
+
+            let remainingWords = words.slice(bestWords);
+            while (remainingWords.length > 0) {
+              this.measurerEl.innerHTML = '';
+              const contP = document.createElement('p');
+              contP.className = 'continuation';
+              this.measurerEl.appendChild(contP);
+
+              let rLow = 1;
+              let rHigh = remainingWords.length;
+              let rBest = 0;
+
+              while (rLow <= rHigh) {
+                const mid = Math.floor((rLow + rHigh) / 2);
+                contP.textContent = remainingWords.slice(0, mid).join(' ');
+                if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+                  rBest = mid;
+                  rLow = mid + 1;
+                } else {
+                  rHigh = mid - 1;
+                }
+              }
+
+              if (rBest === 0 || rBest >= remainingWords.length) {
+                const finalP = document.createElement('p');
+                finalP.className = 'continuation';
+                finalP.textContent = remainingWords.join(' ');
+                currentPageNodes.push(finalP);
+                this.measurerEl.innerHTML = '';
+                this.measurerEl.appendChild(finalP.cloneNode(true));
+                break;
+              } else {
+                const sliceP = document.createElement('p');
+                sliceP.className = 'continuation';
+                sliceP.textContent = remainingWords.slice(0, rBest).join(' ');
+                pages.push([sliceP]);
+                remainingWords = remainingWords.slice(rBest);
+              }
+            }
+          } else {
+            // Not enough space for split on current page, flush current page
+            if (currentPageNodes.length > 0) {
+              pages.push(currentPageNodes);
+              currentPageNodes = [];
+            }
+            this.measurerEl.innerHTML = '';
+
+            this.measurerEl.appendChild(node);
+            if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+              currentPageNodes.push(node.cloneNode(true));
+            } else {
+              // Paragraph larger than full page: split across multiple pages
+              this.measurerEl.removeChild(node);
+              let remWords = words;
+
+              while (remWords.length > 0) {
+                this.measurerEl.innerHTML = '';
+                const pBlock = document.createElement('p');
+                if (pages.length > 0) pBlock.className = 'continuation';
+                this.measurerEl.appendChild(pBlock);
+
+                let bLow = 1;
+                let bHigh = remWords.length;
+                let bBest = 0;
+
+                while (bLow <= bHigh) {
+                  const mid = Math.floor((bLow + bHigh) / 2);
+                  pBlock.textContent = remWords.slice(0, mid).join(' ');
+                  if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+                    bBest = mid;
+                    bLow = mid + 1;
+                  } else {
+                    bHigh = mid - 1;
+                  }
+                }
+
+                if (bBest === 0 || bBest >= remWords.length) {
+                  const finP = document.createElement('p');
+                  if (pages.length > 0) finP.className = 'continuation';
+                  finP.textContent = remWords.join(' ');
+                  currentPageNodes.push(finP);
+                  this.measurerEl.innerHTML = '';
+                  this.measurerEl.appendChild(finP.cloneNode(true));
+                  break;
+                } else {
+                  const partP = document.createElement('p');
+                  if (pages.length > 0) partP.className = 'continuation';
+                  partP.textContent = remWords.slice(0, bBest).join(' ');
+                  pages.push([partP]);
+                  remWords = remWords.slice(bBest);
+                }
+              }
+            }
+          }
+        } else {
+          // Heading or other block: flush current page so chapter/section heading starts at page top
+          if (currentPageNodes.length > 0) {
+            pages.push(currentPageNodes);
+            currentPageNodes = [];
+          }
+          this.measurerEl.innerHTML = '';
+          this.measurerEl.appendChild(node);
+          currentPageNodes.push(node.cloneNode(true));
+        }
+      }
+    }
+
+    if (currentPageNodes.length > 0) {
+      pages.push(currentPageNodes);
+    }
+
+    this.measurerEl.innerHTML = '';
+    const finalPages = pages.length > 0 ? pages : [[document.createElement('p')]];
+
+    // Render pages into single-page carousel track
+    this.trackEl.innerHTML = '';
+    for (const pageNodes of finalPages) {
+      const pageEl = document.createElement('div');
+      pageEl.className = 'reader-page';
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'page-body';
+      for (const n of pageNodes) {
+        bodyEl.appendChild(n);
+      }
+      pageEl.appendChild(bodyEl);
+      this.trackEl.appendChild(pageEl);
+    }
+
+    this.totalPages = finalPages.length;
+  }
+
+  /**
+   * Re-paginates content on font size or window changes.
    * @param {boolean} [animated=false]
    */
   recalculatePages(animated = false) {
-    const frameWidth = this.frameEl.clientWidth;
-    if (frameWidth <= 0) return;
-
-    this.pageWidth = frameWidth;
-    this.pageGap = 32;
-
-    this.contentEl.style.columnWidth = `${this.pageWidth}px`;
-    this.contentEl.style.columnGap = `${this.pageGap}px`;
-
-    // Measure horizontal scroll width to compute exact number of columns
-    const scrollWidth = this.contentEl.scrollWidth;
-    const step = this.pageWidth + this.pageGap;
-    this.totalPages = Math.max(1, Math.round((scrollWidth + this.pageGap) / step));
-
-    // Clamp current page index if font size or window resized
-    if (this.currentPageIndex >= this.totalPages) {
-      this.currentPageIndex = this.totalPages - 1;
-    }
-
+    if (!this.currentMarkdown) return;
+    const prevPage = this.currentPageIndex;
+    this.buildPagesFromMarkdown(this.currentMarkdown);
+    this.currentPageIndex = Math.min(prevPage, this.totalPages - 1);
     this.updateTransform(animated);
     this.notifyProgress();
   }
 
   /**
-   * Applies CSS transform to slide to current page column.
+   * Applies CSS transform to slide to the active page.
    * @param {boolean} [animated=true]
    */
   updateTransform(animated = true) {
-    this.contentEl.style.transition = animated
-      ? 'transform 0.22s cubic-bezier(0.2, 0.9, 0.4, 1)'
+    this.trackEl.style.transition = animated
+      ? 'transform 0.24s cubic-bezier(0.2, 0.9, 0.4, 1)'
       : 'none';
-    const offset = this.currentPageIndex * (this.pageWidth + this.pageGap);
-    this.contentEl.style.transform = `translateX(-${offset}px)`;
+    this.trackEl.style.transform = `translateX(-${this.currentPageIndex * 100}%)`;
   }
 
   /**
@@ -305,7 +467,7 @@ export class VirtualCarousel {
   async nextPage() {
     if (this.isLoadingChapter) return;
 
-    // 1. More pages in current chapter -> slide to next column
+    // 1. More pages in current chapter -> slide to next page
     if (this.currentPageIndex < this.totalPages - 1) {
       this.currentPageIndex++;
       this.updateTransform(true);
@@ -330,7 +492,7 @@ export class VirtualCarousel {
   async prevPage() {
     if (this.isLoadingChapter) return;
 
-    // 1. Prior pages in current chapter -> slide to prev column
+    // 1. Prior pages in current chapter -> slide to previous page
     if (this.currentPageIndex > 0) {
       this.currentPageIndex--;
       this.updateTransform(true);
@@ -400,8 +562,9 @@ export class VirtualCarousel {
    */
   clear() {
     this.chapterRequestId++;
-    this.contentEl.innerHTML = '';
-    this.contentEl.style.transform = 'none';
+    this.trackEl.innerHTML = '';
+    this.trackEl.style.transform = 'none';
     this.chapterCache.clear();
+    this.currentMarkdown = '';
   }
 }

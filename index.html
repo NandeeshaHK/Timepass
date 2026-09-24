@@ -37,11 +37,11 @@
 
     <!-- View 2: Reader View -->
     <section id="view-reader" class="reader-view">
-      <!-- Reader Viewport & Frame for dynamic CSS multi-column paging -->
+      <!-- Reader Viewport & Track for Single-Page Carousel -->
       <div id="reader-viewport" class="reader-viewport" aria-label="Story reader viewport">
-        <div id="reader-frame" class="reader-frame">
-          <div id="reader-content" class="reader-content"></div>
-        </div>
+        <div id="reader-track" class="reader-track"></div>
+        <!-- Off-screen measurer for zero-line-cut dynamic pagination -->
+        <div id="reader-measurer" class="reader-measurer" aria-hidden="true"></div>
       </div>
 
       <!-- Boundary Notification Toast -->
