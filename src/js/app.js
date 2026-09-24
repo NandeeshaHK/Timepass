@@ -6,6 +6,7 @@ import { Router } from './ui/router.js';
 import { VirtualCarousel } from './reader/carousel.js';
 import { TocDrawer } from './reader/toc.js';
 import { WakeLockManager } from './reader/wakelock.js';
+import { FullscreenManager } from './ui/fullscreen.js';
 import { HapticUX } from './ui/haptics.js';
 import { createIcons, icons } from 'lucide';
 
@@ -37,10 +38,15 @@ class App {
     this.progressSlider = /** @type {HTMLInputElement} */ (document.getElementById('progress-slider'));
 
     // Sub-systems
+    this.fullscreen = new FullscreenManager({
+      onChange: (active) => this.handleFullscreenChange(active)
+    });
+
     this.settings = new SettingsManager({
-      onFontSizeChange: () => {
+      onFontSizeChange: (label) => {
         if (this.carousel) {
           this.carousel.recalculatePages(false);
+          this.carousel.showToast(`Text Size: ${label}`);
         }
       }
     });
@@ -57,7 +63,14 @@ class App {
 
     this.router = new Router({
       onNavigateToLibrary: () => this.showLibraryView(),
-      onNavigateToReader: (storyId) => this.openStory(storyId, 0, 0, false)
+      onNavigateToReader: (storyId) => this.openStory(storyId, 0, 0, false),
+      shouldInterceptBack: () => {
+        if (this.toc && this.toc.isOpen) {
+          this.toc.close();
+          return true;
+        }
+        return false;
+      }
     });
 
     this.carousel = new VirtualCarousel({
@@ -85,7 +98,7 @@ class App {
       if (e.key === 'Enter') this.handlePassphraseSubmit();
     });
 
-    // Reader UI buttons
+    // Reader UI buttons: Exit to Library
     const btnBack = document.getElementById('btn-back-to-library');
     if (btnBack) {
       btnBack.addEventListener('click', () => {
@@ -94,9 +107,19 @@ class App {
       });
     }
 
+    // Toggle Chapters Drawer
     const btnOpenToc = document.getElementById('btn-open-toc');
     if (btnOpenToc) {
       btnOpenToc.addEventListener('click', () => this.toc.toggle());
+    }
+
+    // Fullscreen Toggle Button
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+      btnFullscreen.addEventListener('click', () => {
+        HapticUX.buttonTap();
+        this.fullscreen.toggle();
+      });
     }
 
     // Progress slider scrub with debouncing so rapid dragging doesn't flood rendering
@@ -117,11 +140,40 @@ class App {
 
     // Disable standard text copy & context menu to preserve serene distraction-free reading
     document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Global Keyboard shortcuts & exit mechanisms
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.toc && this.toc.isOpen) {
+          this.toc.close();
+        } else if (this.hudContainerEl.classList.contains('hud-visible')) {
+          this.hideHUD();
+        } else if (this.readerViewEl.classList.contains('active')) {
+          HapticUX.backTrigger();
+          this.router.goToLibrary();
+        }
+      }
+
       if ((e.ctrlKey || e.metaKey) && ['c', 'p', 's', 'u'].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
     });
+  }
+
+  /**
+   * Handles fullscreen state change to update HUD icons and reflow reader.
+   * @param {boolean} active
+   */
+  handleFullscreenChange(active) {
+    const iconEl = document.getElementById('icon-fullscreen');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', active ? 'minimize' : 'maximize');
+      createIcons({ icons });
+    }
+    if (this.carousel) {
+      this.carousel.showToast(active ? 'Fullscreen Mode' : 'Standard View');
+      this.carousel.recalculatePages(false);
+    }
   }
 
   toggleHUD() {
@@ -215,10 +267,11 @@ class App {
     this.progressSlider.max = Math.max(0, this.currentStoryMeta.totalChunks - 1).toString();
     this.progressSlider.value = startChapterIndex.toString();
 
-    // Request Wake Lock
+    // Request Wake Lock & enter Fullscreen mode
     WakeLockManager.request();
+    this.fullscreen.enter();
 
-    // Load into dynamic multi-column reader
+    // Load into dynamic single-page carousel reader
     await this.carousel.loadStory(this.currentStoryMeta.totalChunks, startChapterIndex, startPageIndex);
   }
 
@@ -286,6 +339,9 @@ class App {
     this.toc.render(this.currentToc, chapterIndex);
   }
 
+  /**
+   * Clean exit mechanism back to Library view.
+   */
   showLibraryView() {
     this.readerViewEl.classList.remove('active');
     this.libraryViewEl.classList.add('active');
@@ -293,6 +349,9 @@ class App {
     this.currentStoryId = null;
     this.currentStoryMeta = null;
     WakeLockManager.release();
+    this.fullscreen.exit();
+    this.toc.close();
+    this.hideHUD();
     this.library.render(this.catalog);
   }
 }

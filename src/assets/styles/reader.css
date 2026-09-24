@@ -38,6 +38,8 @@
 .reader-page {
   flex: 0 0 100%;
   width: 100%;
+  min-width: 100%;
+  max-width: 100%;
   height: 100%;
   box-sizing: border-box;
   padding: calc(var(--sat) + 26px) max(22px, var(--sal)) calc(var(--sab) + 34px) max(22px, var(--sar));

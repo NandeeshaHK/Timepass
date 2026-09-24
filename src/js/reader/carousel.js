@@ -81,6 +81,25 @@ export class VirtualCarousel {
       if (!isTouching || e.touches.length !== 1) return;
       currentX = e.touches[0].clientX;
       currentY = e.touches[0].clientY;
+
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+
+      // Follow finger horizontally live during drag
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 8) {
+        const pageWidth = this.viewportEl.clientWidth;
+        const baseOffset = this.currentPageIndex * pageWidth;
+        let dragDelta = deltaX;
+        // Resistance if at boundaries
+        if (
+          (this.currentPageIndex === 0 && deltaX > 0 && this.currentChapterIndex === 0) ||
+          (this.currentPageIndex === this.totalPages - 1 && deltaX < 0 && this.currentChapterIndex === this.totalChapters - 1)
+        ) {
+          dragDelta = deltaX * 0.35;
+        }
+        this.trackEl.style.transition = 'none';
+        this.trackEl.style.transform = `translateX(-${baseOffset - dragDelta}px)`;
+      }
     }, { passive: true });
 
     this.viewportEl.addEventListener('touchend', (e) => {
@@ -91,9 +110,11 @@ export class VirtualCarousel {
       const deltaY = currentY - startY;
       const distance = Math.hypot(deltaX, deltaY);
       const elapsed = Date.now() - startTime;
+      const pageWidth = this.viewportEl.clientWidth;
+      const threshold = Math.min(pageWidth * 0.18, 50);
 
       // Horizontal Swipe Gesture Detection
-      if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 600) {
+      if (Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 600) {
         if (deltaX < 0) {
           // Swiped Left -> Next page
           this.nextPage();
@@ -120,7 +141,11 @@ export class VirtualCarousel {
           HapticUX.buttonTap();
           if (this.onToggleHUD) this.onToggleHUD();
         }
+        return;
       }
+
+      // Snap back cleanly to current page if drag was incomplete
+      this.updateTransform(true);
     }, { passive: true });
 
     // 2. Desktop Mouse Click Fallback
@@ -458,7 +483,8 @@ export class VirtualCarousel {
     this.trackEl.style.transition = animated
       ? 'transform 0.24s cubic-bezier(0.2, 0.9, 0.4, 1)'
       : 'none';
-    this.trackEl.style.transform = `translateX(-${this.currentPageIndex * 100}%)`;
+    const pageWidth = this.viewportEl.clientWidth;
+    this.trackEl.style.transform = `translateX(-${this.currentPageIndex * pageWidth}px)`;
   }
 
   /**

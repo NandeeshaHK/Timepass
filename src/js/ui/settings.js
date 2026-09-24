@@ -9,13 +9,15 @@ const FONT_SIZES = [
   'var(--font-size-xxl)'
 ];
 
+const FONT_LABELS = ['Small', 'Normal', 'Large', 'Extra Large', 'Maximum'];
+
 /**
  * Manages user UI preferences including Themes and Font Size scaling.
  */
 export class SettingsManager {
   /**
    * @param {Object} [options]
-   * @param {() => void} [options.onFontSizeChange] - Callback invoked when font size changes to reflow pages.
+   * @param {(label: string) => void} [options.onFontSizeChange] - Callback invoked when font size changes to reflow pages.
    */
   constructor(options = {}) {
     this.onFontSizeChange = options.onFontSizeChange;
@@ -57,7 +59,7 @@ export class SettingsManager {
     Store.setFontSizeIndex(idx);
     document.documentElement.style.setProperty('--font-size-current', FONT_SIZES[idx]);
     if (triggerCallback && this.onFontSizeChange) {
-      this.onFontSizeChange();
+      this.onFontSizeChange(FONT_LABELS[idx]);
     }
   }
 
