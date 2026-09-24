@@ -82,10 +82,15 @@ class App {
       this.toggleHUD();
     });
 
-    // Progress slider scrub
+    // Progress slider scrub with debouncing so rapid dragging doesn't overwhelm decoding
+    let sliderDebounceTimer = null;
     this.progressSlider.addEventListener('input', (e) => {
       const targetChunk = parseInt(e.target.value, 10);
-      this.carousel.goToPage(targetChunk);
+      this.pageProgressText.textContent = `Page ${targetChunk + 1} of ${this.currentStoryMeta?.totalChunks || 1}`;
+      clearTimeout(sliderDebounceTimer);
+      sliderDebounceTimer = setTimeout(() => {
+        this.carousel.goToPage(targetChunk);
+      }, 50);
     });
 
     // WakeLock Visibility

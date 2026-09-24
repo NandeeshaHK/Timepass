@@ -7,12 +7,17 @@ const STORIES_RAW_DIR = path.resolve('stories_raw');
 const PUBLIC_DIR = path.resolve('public');
 const OUTPUT_STORIES_DIR = path.join(PUBLIC_DIR, 'stories');
 
-// AES-256-GCM Encryption with PBKDF2
+// Consistent salt derived per passphrase/story so Web Crypto can cache the PBKDF2 key per session
+function getSaltForPassphrase(passphrase) {
+  return crypto.createHash('sha256').update(passphrase + '_tp_salt_v1').digest().subarray(0, 16);
+}
+
+// AES-256-GCM Encryption with PBKDF2 (using consistent salt for instant decryption caching in browser)
 function encryptPayload(plaintextBuffer, passphrase) {
-  const salt = crypto.randomBytes(16);
+  const salt = getSaltForPassphrase(passphrase);
   // PBKDF2: 100,000 iterations, sha256, 32-byte key (compatible with Web Crypto API)
   const key = crypto.pbkdf2Sync(passphrase, salt, 100000, 32, 'sha256');
-  const iv = crypto.randomBytes(12); // 12 bytes IV for AES-GCM
+  const iv = crypto.randomBytes(12); // Unique 12 bytes IV per file for AES-GCM
 
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintextBuffer), cipher.final()]);
@@ -50,8 +55,8 @@ function parseFrontmatter(content) {
   return { frontmatter, body };
 }
 
-// Chunks markdown text into comfortable reading chunks (~250-350 words or 3-4 paragraphs)
-// and tracks Table of Contents (ToC) positions based on # and ## headers.
+// Chunks markdown text into comfortable reading chunks (~180-260 words or 2-3 short paragraphs)
+// and tracks Table of Contents (ToC) positions based on #, ##, ### headers.
 function processMarkdownToChunks(rawMarkdown, defaultTitle) {
   const { frontmatter, body } = parseFrontmatter(rawMarkdown);
   const lines = body.split(/\r?\n/);
@@ -82,7 +87,7 @@ function processMarkdownToChunks(rawMarkdown, defaultTitle) {
     const headerMatch = line.match(/^(#{1,3})\s+(.*)$/);
 
     if (headerMatch) {
-      // If we encounter a new header, start a new chunk
+      // If we encounter a new header, flush previous chunk so the chapter starts cleanly on a fresh screen
       if (currentChunkLines.length > 0) {
         flushChunk();
       }
@@ -90,11 +95,14 @@ function processMarkdownToChunks(rawMarkdown, defaultTitle) {
       const headingTitle = headerMatch[2].trim();
       const currentChunkIndex = chunks.length;
 
-      toc.push({
-        title: headingTitle,
-        level: level,
-        chunkIndex: currentChunkIndex
-      });
+      // Filter out technical/empty headings from ToC
+      if (headingTitle && !headingTitle.includes('silent_patient_images')) {
+        toc.push({
+          title: headingTitle,
+          level: level,
+          chunkIndex: currentChunkIndex
+        });
+      }
 
       currentChunkLines.push(line);
       currentWordCount += line.split(/\s+/).filter(Boolean).length;
@@ -105,9 +113,9 @@ function processMarkdownToChunks(rawMarkdown, defaultTitle) {
     const wordsInLine = line.split(/\s+/).filter(Boolean).length;
     currentWordCount += wordsInLine;
 
-    // Check if paragraph is complete (empty line follows) and word count exceeds threshold
+    // Check if paragraph break occurs and word count is sufficient for one screen
     const isParagraphEnd = (line.trim() === '') || (i + 1 < lines.length && lines[i + 1].trim() === '');
-    if (isParagraphEnd && currentWordCount >= 250) {
+    if (isParagraphEnd && currentWordCount >= 180) {
       flushChunk();
     }
   }
@@ -191,9 +199,11 @@ async function main() {
     const { meta, toc, chunks } = processMarkdownToChunks(content, defaultTitle);
     const storyOutputDir = path.join(OUTPUT_STORIES_DIR, hashedId);
 
-    if (!fs.existsSync(storyOutputDir)) {
-      fs.mkdirSync(storyOutputDir, { recursive: true });
+    // Clean story output directory before rewriting
+    if (fs.existsSync(storyOutputDir)) {
+      fs.rmSync(storyOutputDir, { recursive: true, force: true });
     }
+    fs.mkdirSync(storyOutputDir, { recursive: true });
 
     // 1. Encrypt and write ToC
     const encryptedToc = encryptPayload(Buffer.from(JSON.stringify(toc), 'utf-8'), passphrase);
