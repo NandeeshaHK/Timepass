@@ -8,95 +8,109 @@ import { TocDrawer } from './reader/toc.js';
 import { WakeLockManager } from './reader/wakelock.js';
 import { createIcons, icons } from 'lucide';
 
+/**
+ * Main Application Controller for Timepass Tea
+ */
 class App {
   constructor() {
+    /** @type {Array<{ id: string, title: string, author: string, synopsis: string, totalChunks: number, estimatedMinutes: number }>} */
     this.catalog = [];
     this.passphrase = Store.getPassphrase();
+    /** @type {string | null} */
     this.currentStoryId = null;
+    /** @type {Object | null} */
     this.currentStoryMeta = null;
+    /** @type {Array<{ title: string, level: number, chunkIndex: number }>} */
     this.currentToc = [];
 
     // UI Elements
-    this.libraryViewEl = document.getElementById('view-library');
-    this.readerViewEl = document.getElementById('view-reader');
-    this.hudContainerEl = document.getElementById('hud-container');
-    this.passphraseModal = document.getElementById('passphrase-modal');
-    this.passphraseInput = document.getElementById('passphrase-input');
-    this.passphraseSubmitBtn = document.getElementById('btn-submit-passphrase');
-    this.passphraseError = document.getElementById('passphrase-error');
-    this.storyTitleHeader = document.getElementById('story-header-title');
-    this.pageProgressText = document.getElementById('page-progress-text');
-    this.progressSlider = document.getElementById('progress-slider');
+    this.libraryViewEl = /** @type {HTMLElement} */ (document.getElementById('view-library'));
+    this.readerViewEl = /** @type {HTMLElement} */ (document.getElementById('view-reader'));
+    this.hudContainerEl = /** @type {HTMLElement} */ (document.getElementById('hud-container'));
+    this.passphraseModal = /** @type {HTMLElement} */ (document.getElementById('passphrase-modal'));
+    this.passphraseInput = /** @type {HTMLInputElement} */ (document.getElementById('passphrase-input'));
+    this.passphraseSubmitBtn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-submit-passphrase'));
+    this.passphraseError = /** @type {HTMLElement} */ (document.getElementById('passphrase-error'));
+    this.storyTitleHeader = /** @type {HTMLElement} */ (document.getElementById('story-header-title'));
+    this.pageProgressText = /** @type {HTMLElement} */ (document.getElementById('page-progress-text'));
+    this.progressSlider = /** @type {HTMLInputElement} */ (document.getElementById('progress-slider'));
 
     // Sub-systems
-    this.settings = new SettingsManager();
+    this.settings = new SettingsManager({
+      onFontSizeChange: () => {
+        if (this.carousel) {
+          this.carousel.recalculatePages(false);
+        }
+      }
+    });
+
     this.library = new LibraryView({
-      onSelectStory: (id, startChunk) => this.openStory(id, startChunk)
+      onSelectStory: (id, chapterIdx, pageIdx) => this.openStory(id, chapterIdx, pageIdx)
     });
 
     this.toc = new TocDrawer({
-      onSelectChapter: (chunkIndex) => {
-        this.carousel.goToPage(chunkIndex);
+      onSelectChapter: (chapterIndex) => {
+        this.carousel.goToChapter(chapterIndex, 0);
       }
     });
 
     this.router = new Router({
       onNavigateToLibrary: () => this.showLibraryView(),
-      onNavigateToReader: (storyId) => this.openStory(storyId, 0, false)
+      onNavigateToReader: (storyId) => this.openStory(storyId, 0, 0, false)
     });
 
     this.carousel = new VirtualCarousel({
-      containerEl: document.getElementById('carousel-viewport'),
+      viewportEl: /** @type {HTMLElement} */ (document.getElementById('reader-viewport')),
+      frameEl: /** @type {HTMLElement} */ (document.getElementById('reader-frame')),
+      contentEl: /** @type {HTMLElement} */ (document.getElementById('reader-content')),
+      toastEl: /** @type {HTMLElement} */ (document.getElementById('reader-toast')),
       fetchAndDecryptChunk: (index) => this.fetchStoryChunk(index),
-      onPageChange: (current, total) => this.onPageChange(current, total)
+      onPageChange: (chapterIdx, totalChapters, pageIdx, totalPages) =>
+        this.onPageChange(chapterIdx, totalChapters, pageIdx, totalPages),
+      onToggleHUD: () => this.toggleHUD()
     });
 
     this.initEventListeners();
     this.bootstrap();
   }
 
+  /**
+   * Initializes top-level UI event listeners.
+   */
   initEventListeners() {
-    // Passphrase Submission
+    // Passphrase submission
     this.passphraseSubmitBtn.addEventListener('click', () => this.handlePassphraseSubmit());
     this.passphraseInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handlePassphraseSubmit();
     });
 
     // Reader UI buttons
-    document.getElementById('btn-back-to-library').addEventListener('click', () => {
-      this.router.goToLibrary();
-    });
+    const btnBack = document.getElementById('btn-back-to-library');
+    if (btnBack) {
+      btnBack.addEventListener('click', () => this.router.goToLibrary());
+    }
 
-    document.getElementById('btn-open-toc').addEventListener('click', () => {
-      this.toc.toggle();
-    });
+    const btnOpenToc = document.getElementById('btn-open-toc');
+    if (btnOpenToc) {
+      btnOpenToc.addEventListener('click', () => this.toc.toggle());
+    }
 
-    // Tap Zones (20% Left = Prev, 60% Center = HUD Toggle, 20% Right = Next)
-    document.getElementById('tap-left').addEventListener('click', () => {
-      this.carousel.prev();
-    });
-    document.getElementById('tap-right').addEventListener('click', () => {
-      this.carousel.next();
-    });
-    document.getElementById('tap-center').addEventListener('click', () => {
-      this.toggleHUD();
-    });
-
-    // Progress slider scrub with debouncing so rapid dragging doesn't overwhelm decoding
+    // Progress slider scrub with debouncing so rapid dragging doesn't flood rendering
     let sliderDebounceTimer = null;
     this.progressSlider.addEventListener('input', (e) => {
-      const targetChunk = parseInt(e.target.value, 10);
-      this.pageProgressText.textContent = `Page ${targetChunk + 1} of ${this.currentStoryMeta?.totalChunks || 1}`;
+      const targetInput = /** @type {HTMLInputElement} */ (e.target);
+      const targetChapter = parseInt(targetInput.value, 10);
+      this.pageProgressText.textContent = `Chapter ${targetChapter + 1} of ${this.currentStoryMeta?.totalChunks || 1}`;
       clearTimeout(sliderDebounceTimer);
       sliderDebounceTimer = setTimeout(() => {
-        this.carousel.goToPage(targetChunk);
-      }, 50);
+        this.carousel.goToChapter(targetChapter, 0);
+      }, 60);
     });
 
-    // WakeLock Visibility
+    // WakeLock Visibility listener
     WakeLockManager.initVisibilityListener(() => this.readerViewEl.classList.contains('active'));
 
-    // Disable standard text copy & context menu
+    // Disable standard text copy & context menu to preserve serene distraction-free reading
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && ['c', 'p', 's', 'u'].includes(e.key.toLowerCase())) {
@@ -148,6 +162,10 @@ class App {
     }
   }
 
+  /**
+   * Fetches and decrypts story catalog.
+   * @param {string} passphrase
+   */
   async loadCatalog(passphrase) {
     const res = await fetch('catalog.json.enc');
     if (!res.ok) {
@@ -158,7 +176,14 @@ class App {
     this.library.render(this.catalog);
   }
 
-  async openStory(storyId, startChunkIndex = 0, updateHistory = true) {
+  /**
+   * Opens story at specified chapter and page.
+   * @param {string} storyId
+   * @param {number} [startChapterIndex=0]
+   * @param {number} [startPageIndex=0]
+   * @param {boolean} [updateHistory=true]
+   */
+  async openStory(storyId, startChapterIndex = 0, startPageIndex = 0, updateHistory = true) {
     this.currentStoryId = storyId;
     this.currentStoryMeta = this.catalog.find(s => s.id === storyId);
 
@@ -179,17 +204,21 @@ class App {
     // Fetch and decrypt Table of Contents
     await this.fetchToc(storyId);
 
-    // Initialize progress slider bounds
-    this.progressSlider.max = (this.currentStoryMeta.totalChunks - 1).toString();
-    this.progressSlider.value = startChunkIndex.toString();
+    // Initialize progress slider bounds for chapters
+    this.progressSlider.max = Math.max(0, this.currentStoryMeta.totalChunks - 1).toString();
+    this.progressSlider.value = startChapterIndex.toString();
 
     // Request Wake Lock
     WakeLockManager.request();
 
-    // Load into virtual carousel
-    await this.carousel.loadStory(this.currentStoryMeta.totalChunks, startChunkIndex);
+    // Load into dynamic multi-column reader
+    await this.carousel.loadStory(this.currentStoryMeta.totalChunks, startChapterIndex, startPageIndex);
   }
 
+  /**
+   * Fetches and decrypts Table of Contents for the story.
+   * @param {string} storyId
+   */
   async fetchToc(storyId) {
     try {
       const res = await fetch(`stories/${storyId}/toc.json.enc`);
@@ -207,28 +236,47 @@ class App {
     this.toc.render(this.currentToc, 0);
   }
 
-  async fetchStoryChunk(chunkIndex) {
+  /**
+   * Fetches and decrypts a specific chapter chunk.
+   * @param {number} chapterIndex
+   * @returns {Promise<string>}
+   */
+  async fetchStoryChunk(chapterIndex) {
     if (!this.currentStoryId) return '';
     try {
-      const res = await fetch(`stories/${this.currentStoryId}/chunk-${chunkIndex}.enc`);
+      const res = await fetch(`stories/${this.currentStoryId}/chunk-${chapterIndex}.enc`);
       if (!res.ok) return '';
       const buffer = await res.arrayBuffer();
       return await decryptEncPayload(buffer, this.passphrase);
     } catch (err) {
-      console.error(`Failed to decrypt chunk ${chunkIndex}:`, err);
+      console.error(`Failed to decrypt chapter ${chapterIndex}:`, err);
       return '<p style="color:#D32F2F;">[Error decrypting page content]</p>';
     }
   }
 
-  onPageChange(chunkIndex, totalChunks) {
-    this.pageProgressText.textContent = `Page ${chunkIndex + 1} of ${totalChunks}`;
-    this.progressSlider.value = chunkIndex.toString();
-    
-    // Save reading progress
-    Store.setStoryProgress(this.currentStoryId, chunkIndex, this.currentStoryMeta?.title || '');
-    
+  /**
+   * Handles progress update from reader engine.
+   * @param {number} chapterIndex
+   * @param {number} totalChapters
+   * @param {number} pageIndex
+   * @param {number} totalPages
+   */
+  onPageChange(chapterIndex, totalChapters, pageIndex, totalPages) {
+    this.pageProgressText.textContent = `Ch. ${chapterIndex + 1}/${totalChapters} · Page ${pageIndex + 1}/${totalPages}`;
+    this.progressSlider.value = chapterIndex.toString();
+
+    // Save reading progress to localStorage
+    if (this.currentStoryId) {
+      Store.setStoryProgress(
+        this.currentStoryId,
+        chapterIndex,
+        pageIndex,
+        this.currentStoryMeta?.title || ''
+      );
+    }
+
     // Update active item in chapter drawer
-    this.toc.render(this.currentToc, chunkIndex);
+    this.toc.render(this.currentToc, chapterIndex);
   }
 
   showLibraryView() {

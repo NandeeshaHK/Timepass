@@ -55,9 +55,20 @@ function parseFrontmatter(content) {
   return { frontmatter, body };
 }
 
-// Chunks markdown text into comfortable reading chunks (~180-260 words or 2-3 short paragraphs)
-// and tracks Table of Contents (ToC) positions based on #, ##, ### headers.
-function processMarkdownToChunks(rawMarkdown, defaultTitle) {
+/**
+ * Splits markdown text into natural chapters and major sections based on headers (#, ##, ###)
+ * and generates a Table of Contents. Avoids artificial word-boundary chunking so text flows
+ * seamlessly onto dynamic columns in the reader without line cuts.
+ *
+ * @param {string} rawMarkdown - The complete raw markdown of the story.
+ * @param {string} defaultTitle - Fallback title if frontmatter does not define one.
+ * @returns {{
+ *   meta: { title: string, author: string, synopsis: string, totalChunks: number, estimatedMinutes: number },
+ *   toc: Array<{ title: string, level: number, chunkIndex: number }>,
+ *   chunks: string[]
+ * }}
+ */
+function processMarkdownToChapters(rawMarkdown, defaultTitle) {
   const { frontmatter, body } = parseFrontmatter(rawMarkdown);
   const lines = body.split(/\r?\n/);
 
@@ -66,19 +77,24 @@ function processMarkdownToChunks(rawMarkdown, defaultTitle) {
   const author = frontmatter.author || 'Anonymous';
 
   const chunks = [];
-  const toc = []; // Array of { title: string, level: number, chunkIndex: number }
+  const toc = [];
+  let currentLines = [];
+  let currentTitle = 'Beginning';
+  let currentLevel = 1;
 
-  let currentChunkLines = [];
-  let currentWordCount = 0;
-
-  function flushChunk() {
-    if (currentChunkLines.length > 0) {
-      const chunkText = currentChunkLines.join('\n').trim();
-      if (chunkText.length > 0) {
-        chunks.push(chunkText);
+  function flushChapter() {
+    if (currentLines.length > 0) {
+      const text = currentLines.join('\n').trim();
+      if (text.length > 0) {
+        const chapterIdx = chunks.length;
+        chunks.push(text);
+        toc.push({
+          title: currentTitle,
+          level: currentLevel,
+          chunkIndex: chapterIdx
+        });
       }
-      currentChunkLines = [];
-      currentWordCount = 0;
+      currentLines = [];
     }
   }
 
@@ -87,43 +103,28 @@ function processMarkdownToChunks(rawMarkdown, defaultTitle) {
     const headerMatch = line.match(/^(#{1,3})\s+(.*)$/);
 
     if (headerMatch) {
-      // If we encounter a new header, flush previous chunk so the chapter starts cleanly on a fresh screen
-      if (currentChunkLines.length > 0) {
-        flushChunk();
-      }
       const level = headerMatch[1].length;
       const headingTitle = headerMatch[2].trim();
-      const currentChunkIndex = chunks.length;
 
-      // Filter out technical/empty headings from ToC
-      if (headingTitle && !headingTitle.includes('silent_patient_images')) {
-        toc.push({
-          title: headingTitle,
-          level: level,
-          chunkIndex: currentChunkIndex
-        });
+      // Flush previously accumulated chapter text before starting a new chapter
+      if (currentLines.length > 0) {
+        flushChapter();
       }
 
-      currentChunkLines.push(line);
-      currentWordCount += line.split(/\s+/).filter(Boolean).length;
+      currentTitle = headingTitle;
+      currentLevel = level;
+      currentLines.push(line);
       continue;
     }
 
-    currentChunkLines.push(line);
-    const wordsInLine = line.split(/\s+/).filter(Boolean).length;
-    currentWordCount += wordsInLine;
-
-    // Check if paragraph break occurs and word count is sufficient for one screen
-    const isParagraphEnd = (line.trim() === '') || (i + 1 < lines.length && lines[i + 1].trim() === '');
-    if (isParagraphEnd && currentWordCount >= 180) {
-      flushChunk();
-    }
+    currentLines.push(line);
   }
 
-  flushChunk(); // Final flush
+  flushChapter();
 
-  // If no ToC found from headers, add a default start point
-  if (toc.length === 0) {
+  // If no headings found in the entire document, treat whole body as single chapter
+  if (chunks.length === 0 && body.trim().length > 0) {
+    chunks.push(body.trim());
     toc.push({ title: 'Beginning', level: 1, chunkIndex: 0 });
   }
 
@@ -196,7 +197,7 @@ async function main() {
     const hashedId = generate8CharHash(rawId);
     console.log(`Processing '${filename}' -> 8-Char ID: [${hashedId}]`);
 
-    const { meta, toc, chunks } = processMarkdownToChunks(content, defaultTitle);
+    const { meta, toc, chunks } = processMarkdownToChapters(content, defaultTitle);
     const storyOutputDir = path.join(OUTPUT_STORIES_DIR, hashedId);
 
     // Clean story output directory before rewriting

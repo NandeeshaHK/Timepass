@@ -8,17 +8,28 @@ const FONT_SIZES = [
   'var(--font-size-xxl)'
 ];
 
+/**
+ * Manages user UI preferences including Themes and Font Size scaling.
+ */
 export class SettingsManager {
-  constructor() {
+  /**
+   * @param {Object} [options]
+   * @param {() => void} [options.onFontSizeChange] - Callback invoked when font size changes to reflow pages.
+   */
+  constructor(options = {}) {
+    this.onFontSizeChange = options.onFontSizeChange;
     this.currentFontIdx = Store.getFontSizeIndex();
     this.currentTheme = Store.getTheme();
 
     this.applyTheme(this.currentTheme);
-    this.applyFontSize(this.currentFontIdx);
+    this.applyFontSize(this.currentFontIdx, false);
 
     this.initButtons();
   }
 
+  /**
+   * @param {'light' | 'dark'} theme
+   */
   applyTheme(theme) {
     this.currentTheme = theme;
     Store.setTheme(theme);
@@ -33,20 +44,27 @@ export class SettingsManager {
     this.applyTheme(nextTheme);
   }
 
-  applyFontSize(idx) {
+  /**
+   * @param {number} idx
+   * @param {boolean} [triggerCallback=true]
+   */
+  applyFontSize(idx, triggerCallback = true) {
     if (idx < 0) idx = 0;
     if (idx >= FONT_SIZES.length) idx = FONT_SIZES.length - 1;
     this.currentFontIdx = idx;
     Store.setFontSizeIndex(idx);
     document.documentElement.style.setProperty('--font-size-current', FONT_SIZES[idx]);
+    if (triggerCallback && this.onFontSizeChange) {
+      this.onFontSizeChange();
+    }
   }
 
   increaseFont() {
-    this.applyFontSize(this.currentFontIdx + 1);
+    this.applyFontSize(this.currentFontIdx + 1, true);
   }
 
   decreaseFont() {
-    this.applyFontSize(this.currentFontIdx - 1);
+    this.applyFontSize(this.currentFontIdx - 1, true);
   }
 
   initButtons() {

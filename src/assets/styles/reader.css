@@ -12,104 +12,112 @@
   display: flex;
 }
 
-/* 3-Container Virtual Carousel (Horizontal Swipe Only) */
-.carousel-viewport {
+/* Reader Viewport (Full surface touch & gesture handling) */
+.reader-viewport {
   width: 100%;
   height: 100%;
-  display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-  touch-action: pan-x; /* Explicitly horizontal only - disable vertical gestures */
-  overscroll-behavior-x: none;
-}
-
-.carousel-viewport::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-
-.carousel-page {
-  flex: 0 0 100%;
-  width: 100%;
-  height: 100%;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: calc(var(--sat) + 24px) max(20px, var(--sal)) calc(var(--sab) + 24px) max(20px, var(--sar));
-  box-sizing: border-box;
   position: relative;
-  overflow: hidden; /* No vertical overflow */
+  overflow: hidden;
+  touch-action: pan-y pinch-zoom;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
 }
 
-/* Page Text Content Container - Sized cleanly for instant screen view */
-.page-content {
-  max-width: 680px;
+/* Page Frame: Centers reading text to max 680px width & manages viewport clippings */
+.reader-frame {
   width: 100%;
-  max-height: 100%;
+  max-width: 680px;
+  height: 100%;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden; /* Crucial: Clips all non-active columns for clean 1-page presentation */
+  box-sizing: border-box;
+  padding: calc(var(--sat) + 24px) 20px calc(var(--sab) + 32px);
+}
+
+/* Page Content: CSS Multi-column flow automatically divides chapter into columns without line cuts */
+.reader-content {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  column-fill: auto;
   font-family: var(--font-serif);
   font-size: var(--font-size-current);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
   color: var(--text-main);
   word-wrap: break-word;
-  overflow: hidden; /* Content fits cleanly on screen; advance via swipe */
-  padding: 8px 12px;
-  -webkit-user-select: none;
+  overflow-wrap: break-word;
   user-select: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  -webkit-user-select: none;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.4, 1);
+  will-change: transform;
 }
 
-.page-content p {
-  margin-bottom: 1.1em;
-  text-indent: 1em;
-}
-
-.page-content p:first-of-type {
-  text-indent: 0;
-}
-
-.page-content h1, .page-content h2, .page-content h3 {
+.reader-content h1,
+.reader-content h2,
+.reader-content h3 {
   font-family: var(--font-family);
   margin-top: 0.4em;
-  margin-bottom: 0.5em;
-  line-height: 1.25;
+  margin-bottom: 0.6em;
+  line-height: 1.3;
+  break-after: avoid;
+  break-inside: avoid;
   color: var(--text-main);
 }
 
-/* Transparent Tap Zones for Page Turning & HUD Toggle */
-.tap-zone-left {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 22%;
-  height: 100%;
-  z-index: 10;
+.reader-content p {
+  margin-top: 0;
+  margin-bottom: 1.15em;
+  text-indent: 1.2em;
+  orphans: 2;
+  widows: 2;
+  break-inside: auto;
 }
 
-.tap-zone-center {
-  position: absolute;
-  top: 0;
-  left: 22%;
-  width: 56%;
-  height: 100%;
-  z-index: 10;
+.reader-content p:first-of-type {
+  text-indent: 0;
 }
 
-.tap-zone-right {
+.reader-content blockquote {
+  break-inside: avoid;
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--text-muted);
+  font-style: italic;
+}
+
+.reader-content img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  break-inside: avoid;
+}
+
+/* Ephemeral Toast for Boundaries (e.g. End of Story / Beginning of Story) */
+.reader-toast {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 22%;
-  height: 100%;
-  z-index: 10;
+  bottom: calc(var(--sab) + 36px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 40;
+}
+
+.reader-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* Distraction-Free HUD Overlay (Auto-hidden, toggled by center tap) */

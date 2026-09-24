@@ -34,14 +34,14 @@ export class TocDrawer {
       const li = document.createElement('li');
       li.className = `toc-item ${item.level === 2 ? 'level-2' : ''}`;
       
-      // Determine if current chunk falls inside this chapter
+      // Highlight currently active chapter
       if (item.chunkIndex === currentChunkIndex) {
         li.classList.add('active');
       }
 
       li.innerHTML = `
         <span>${item.title}</span>
-        <span style="font-size: 0.85rem; color: var(--text-muted)">p. ${item.chunkIndex + 1}</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted)">Ch. ${item.chunkIndex + 1}</span>
       `;
 
       li.addEventListener('click', () => {

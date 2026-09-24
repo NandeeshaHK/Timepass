@@ -51,22 +51,50 @@ export const Store = {
     localStorage.setItem(STORAGE_KEYS.FONT_SIZE_INDEX, index.toString());
   },
 
-  // Reading Progress per Story
+  /**
+   * Reading Progress per Story
+   * @param {string} storyId
+   * @returns {{ chapterIndex: number, pageIndex: number }}
+   */
   getStoryProgress(storyId) {
     const saved = localStorage.getItem(STORAGE_KEYS.PROGRESS_PREFIX + storyId);
-    return saved ? parseInt(saved, 10) : 0;
+    if (!saved) return { chapterIndex: 0, pageIndex: 0 };
+    try {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed === 'number') {
+        return { chapterIndex: parsed, pageIndex: 0 };
+      }
+      return {
+        chapterIndex: typeof parsed.chapterIndex === 'number' ? parsed.chapterIndex : 0,
+        pageIndex: typeof parsed.pageIndex === 'number' ? parsed.pageIndex : 0
+      };
+    } catch {
+      const num = parseInt(saved, 10);
+      return { chapterIndex: isNaN(num) ? 0 : num, pageIndex: 0 };
+    }
   },
 
-  setStoryProgress(storyId, chunkIndex, storyTitle = '') {
-    localStorage.setItem(STORAGE_KEYS.PROGRESS_PREFIX + storyId, chunkIndex.toString());
+  /**
+   * @param {string} storyId
+   * @param {number} chapterIndex
+   * @param {number} [pageIndex=0]
+   * @param {string} [storyTitle='']
+   */
+  setStoryProgress(storyId, chapterIndex, pageIndex = 0, storyTitle = '') {
+    localStorage.setItem(STORAGE_KEYS.PROGRESS_PREFIX + storyId, JSON.stringify({ chapterIndex, pageIndex }));
     localStorage.setItem(STORAGE_KEYS.LAST_READ, JSON.stringify({
       storyId,
-      chunkIndex,
+      chunkIndex: chapterIndex,
+      chapterIndex,
+      pageIndex,
       title: storyTitle,
       timestamp: Date.now()
     }));
   },
 
+  /**
+   * @returns {{ storyId: string, chunkIndex: number, chapterIndex: number, pageIndex: number, title: string, timestamp: number } | null}
+   */
   getLastRead() {
     const saved = localStorage.getItem(STORAGE_KEYS.LAST_READ);
     return saved ? JSON.parse(saved) : null;

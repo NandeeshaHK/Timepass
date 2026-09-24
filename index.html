@@ -37,13 +37,15 @@
 
     <!-- View 2: Reader View -->
     <section id="view-reader" class="reader-view">
-      <!-- 3-Container Virtual Carousel -->
-      <div id="carousel-viewport" class="carousel-viewport"></div>
+      <!-- Reader Viewport & Frame for dynamic CSS multi-column paging -->
+      <div id="reader-viewport" class="reader-viewport" aria-label="Story reader viewport">
+        <div id="reader-frame" class="reader-frame">
+          <div id="reader-content" class="reader-content"></div>
+        </div>
+      </div>
 
-      <!-- Left / Center / Right Tap Interaction Zones -->
-      <div id="tap-left" class="tap-zone-left" aria-label="Previous Page"></div>
-      <div id="tap-center" class="tap-zone-center" aria-label="Toggle Controls"></div>
-      <div id="tap-right" class="tap-zone-right" aria-label="Next Page"></div>
+      <!-- Boundary Notification Toast -->
+      <div id="reader-toast" class="reader-toast" role="status" aria-live="polite"></div>
 
       <!-- Distraction-Free HUD Overlay (Auto-hidden) -->
       <div id="hud-container">
