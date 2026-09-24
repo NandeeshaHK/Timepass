@@ -1,4 +1,5 @@
 import { Store } from '../storage/store.js';
+import { HapticUX } from './haptics.js';
 
 export class LibraryView {
   constructor({ onSelectStory }) {
@@ -37,6 +38,7 @@ export class LibraryView {
     `;
 
     document.getElementById('btn-continue-reading').addEventListener('click', () => {
+      HapticUX.pageStart();
       if (this.onSelectStory) {
         this.onSelectStory(storyMeta.id, lastRead.chapterIndex ?? lastRead.chunkIndex ?? 0, lastRead.pageIndex ?? 0);
       }
@@ -74,6 +76,7 @@ export class LibraryView {
       `;
 
       card.addEventListener('click', () => {
+        HapticUX.pageStart();
         if (this.onSelectStory) {
           this.onSelectStory(story.id, savedProg.chapterIndex, savedProg.pageIndex);
         }

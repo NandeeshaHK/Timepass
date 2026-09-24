@@ -1,8 +1,13 @@
+import { HapticUX } from '../ui/haptics.js';
+
 /**
  * Pre-computed Chapter Table of Contents Drawer Controller
  */
-
 export class TocDrawer {
+  /**
+   * @param {Object} options
+   * @param {(chapterIndex: number) => void} options.onSelectChapter
+   */
   constructor({ onSelectChapter }) {
     this.onSelectChapter = onSelectChapter;
     this.drawerEl = document.getElementById('toc-drawer');
@@ -22,6 +27,10 @@ export class TocDrawer {
     });
   }
 
+  /**
+   * @param {Array<{ title: string, level: number, chunkIndex: number }>} tocItems
+   * @param {number} currentChunkIndex
+   */
   render(tocItems, currentChunkIndex) {
     this.listEl.innerHTML = '';
     
@@ -45,6 +54,7 @@ export class TocDrawer {
       `;
 
       li.addEventListener('click', () => {
+        HapticUX.selected();
         this.close();
         if (this.onSelectChapter) {
           this.onSelectChapter(item.chunkIndex);
@@ -56,13 +66,19 @@ export class TocDrawer {
   }
 
   open() {
-    this.isOpen = true;
-    this.drawerEl.classList.add('open');
+    if (!this.isOpen) {
+      this.isOpen = true;
+      this.drawerEl.classList.add('open');
+      HapticUX.menuOpen();
+    }
   }
 
   close() {
-    this.isOpen = false;
-    this.drawerEl.classList.remove('open');
+    if (this.isOpen) {
+      this.isOpen = false;
+      this.drawerEl.classList.remove('open');
+      HapticUX.menuClose();
+    }
   }
 
   toggle() {

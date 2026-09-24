@@ -1,4 +1,5 @@
 import { Store } from '../storage/store.js';
+import { HapticUX } from './haptics.js';
 
 const FONT_SIZES = [
   'var(--font-size-sm)',
@@ -40,6 +41,7 @@ export class SettingsManager {
   }
 
   toggleTheme() {
+    HapticUX.fontChange();
     const nextTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
     this.applyTheme(nextTheme);
   }
@@ -60,10 +62,12 @@ export class SettingsManager {
   }
 
   increaseFont() {
+    HapticUX.fontChange();
     this.applyFontSize(this.currentFontIdx + 1, true);
   }
 
   decreaseFont() {
+    HapticUX.fontChange();
     this.applyFontSize(this.currentFontIdx - 1, true);
   }
 

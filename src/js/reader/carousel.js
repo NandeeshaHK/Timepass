@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { HapticUX } from '../ui/haptics.js';
 
 /**
  * Dynamic Multi-Column E-Reader Engine with Touch Gestures,
@@ -116,6 +117,7 @@ export class VirtualCarousel {
           this.nextPage();
         } else {
           // Center 56% -> Toggle HUD
+          HapticUX.buttonTap();
           if (this.onToggleHUD) this.onToggleHUD();
         }
       }
@@ -137,6 +139,7 @@ export class VirtualCarousel {
       } else if (clickX > screenWidth * 0.78) {
         this.nextPage();
       } else {
+        HapticUX.buttonTap();
         if (this.onToggleHUD) this.onToggleHUD();
       }
     });
@@ -307,13 +310,16 @@ export class VirtualCarousel {
       this.currentPageIndex++;
       this.updateTransform(true);
       this.notifyProgress();
+      HapticUX.buttonTap();
       return;
     }
 
     // 2. At last page of current chapter -> advance to next chapter
     if (this.currentChapterIndex < this.totalChapters - 1) {
+      HapticUX.buttonTap();
       await this.goToChapter(this.currentChapterIndex + 1, 0, 'slide-left');
     } else {
+      HapticUX.pageEnd();
       this.showToast('— End of Story —');
     }
   }
@@ -329,13 +335,16 @@ export class VirtualCarousel {
       this.currentPageIndex--;
       this.updateTransform(true);
       this.notifyProgress();
+      HapticUX.buttonTap();
       return;
     }
 
     // 2. At first page of current chapter -> move to previous chapter's last page
     if (this.currentChapterIndex > 0) {
+      HapticUX.buttonTap();
       await this.goToChapter(this.currentChapterIndex - 1, 'last', 'slide-right');
     } else {
+      HapticUX.pageEnd();
       this.showToast('— Beginning of Story —');
     }
   }

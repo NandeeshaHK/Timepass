@@ -6,6 +6,7 @@ import { Router } from './ui/router.js';
 import { VirtualCarousel } from './reader/carousel.js';
 import { TocDrawer } from './reader/toc.js';
 import { WakeLockManager } from './reader/wakelock.js';
+import { HapticUX } from './ui/haptics.js';
 import { createIcons, icons } from 'lucide';
 
 /**
@@ -87,7 +88,10 @@ class App {
     // Reader UI buttons
     const btnBack = document.getElementById('btn-back-to-library');
     if (btnBack) {
-      btnBack.addEventListener('click', () => this.router.goToLibrary());
+      btnBack.addEventListener('click', () => {
+        HapticUX.backTrigger();
+        this.router.goToLibrary();
+      });
     }
 
     const btnOpenToc = document.getElementById('btn-open-toc');
@@ -98,6 +102,7 @@ class App {
     // Progress slider scrub with debouncing so rapid dragging doesn't flood rendering
     let sliderDebounceTimer = null;
     this.progressSlider.addEventListener('input', (e) => {
+      HapticUX.sliderTick();
       const targetInput = /** @type {HTMLInputElement} */ (e.target);
       const targetChapter = parseInt(targetInput.value, 10);
       this.pageProgressText.textContent = `Chapter ${targetChapter + 1} of ${this.currentStoryMeta?.totalChunks || 1}`;
@@ -153,8 +158,10 @@ class App {
       await this.loadCatalog(inputPass);
       this.passphrase = inputPass;
       Store.setPassphrase(inputPass, true);
+      HapticUX.selected();
       this.passphraseModal.style.display = 'none';
     } catch (err) {
+      HapticUX.pageEnd();
       this.passphraseError.textContent = 'Incorrect passphrase or unable to decrypt catalog.';
       this.passphraseError.style.display = 'block';
     } finally {
