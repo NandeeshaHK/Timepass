@@ -56,7 +56,7 @@
   max-width: 680px;
   height: 100%;
   box-sizing: border-box;
-  font-family: var(--font-serif);
+  font-family: var(--font-reader);
   font-size: var(--font-size-current);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
@@ -68,7 +68,8 @@
   justify-content: flex-start;
 }
 
-.page-body h1, .page-body h2, .page-body h3 {
+.page-body h1, .page-body h2, .page-body h3,
+.reader-measurer h1, .reader-measurer h2, .reader-measurer h3 {
   font-family: var(--font-family);
   margin-top: 0.2em;
   margin-bottom: 0.5em;
@@ -77,22 +78,26 @@
   flex-shrink: 0;
 }
 
-.page-body p {
+.page-body p,
+.reader-measurer p {
   margin-top: 0;
   margin-bottom: 1.15em;
   text-indent: 1.2em;
   flex-shrink: 0;
 }
 
-.page-body p.continuation {
+.page-body p.continuation,
+.reader-measurer p.continuation {
   text-indent: 0;
 }
 
-.page-body p:first-of-type {
+.page-body p:first-of-type,
+.reader-measurer p:first-of-type {
   text-indent: 0;
 }
 
-.page-body blockquote {
+.page-body blockquote,
+.reader-measurer blockquote {
   margin: 0.8em 0;
   padding-left: 1em;
   border-left: 3px solid var(--text-muted);
@@ -100,7 +105,8 @@
   flex-shrink: 0;
 }
 
-.page-body img {
+.page-body img,
+.reader-measurer img {
   max-width: 100%;
   max-height: 50vh;
   object-fit: contain;
@@ -115,7 +121,7 @@
   width: 100%;
   max-width: 680px;
   box-sizing: border-box;
-  font-family: var(--font-serif);
+  font-family: var(--font-reader);
   font-size: var(--font-size-current);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
@@ -195,27 +201,29 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  width: 100%;
 }
 
 /* Prominent, uncluttered Back to Library Button */
 .btn-back-library {
   flex-shrink: 0;
-  padding: 8px 14px;
-  min-height: 42px;
-  font-size: 1rem;
+  padding: 6px 12px;
+  min-height: 38px;
+  font-size: 0.95rem;
+  font-weight: 600;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: var(--text-main);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .story-header-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -223,7 +231,7 @@
   text-align: center;
   flex: 1;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 
 .hud-controls-group {
@@ -233,12 +241,22 @@
   flex-shrink: 0;
 }
 
-.hud-controls-group button {
-  min-height: 40px;
-  min-width: 40px;
-  padding: 6px 10px;
+.hud-controls-group button,
+.hud-btn-icon {
+  min-height: 38px;
+  min-width: 38px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.95rem;
   border-radius: 8px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .hud-bottom-content {
@@ -249,9 +267,48 @@
   gap: 8px;
 }
 
+.hud-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.hud-font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-card);
+  padding: 2px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.btn-font-scale {
+  min-height: 32px;
+  min-width: 36px;
+  padding: 4px 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.btn-font-scale:active {
+  background-color: var(--border-color);
+}
+
 .progress-info {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   font-size: 0.95rem;
   color: var(--text-muted);
   font-weight: 600;

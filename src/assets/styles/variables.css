@@ -26,9 +26,10 @@
   --accent-color: var(--accent-color-light);
   --hud-bg: var(--hud-bg-light);
 
-  /* Typography scale with Kannada & universal serif support */
+  /* Typography scale with Sans-serif Monospace & universal Kannada support */
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Nirmala UI", "Tunga", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Merriweather", "Georgia", "Nirmala UI", "Tunga", "Mallige", "Kedage", "Cambria", serif;
+  --font-reader: ui-monospace, "Cascadia Code", "SF Mono", "Roboto Mono", "Consolas", "Nirmala UI", "Segoe UI", monospace, sans-serif;
+  --font-serif: var(--font-reader);
   
   --font-size-sm: 1.1rem;   /* 17.6px */
   --font-size-md: 1.35rem;  /* 21.6px - Default elder-friendly */

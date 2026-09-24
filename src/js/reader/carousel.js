@@ -266,6 +266,140 @@ export class VirtualCarousel {
   }
 
   /**
+   * Splits text into complete sentences based on terminal punctuation (. ! ? । ॥)
+   * while keeping quotation marks and closing brackets attached to their respective sentence.
+   * @param {string} text
+   * @returns {string[]}
+   */
+  splitIntoSentences(text) {
+    if (!text) return [];
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+
+    // Match sentences ending with . ! ? । ॥ and optional trailing quotes/brackets
+    // Any remaining trailing text without punctuation is captured as the final sentence
+    const regex = /[^.!?।॥]+(?:[.!?।॥]+["'»”’)}\]]*|$)/gu;
+    const matches = trimmed.match(regex);
+    if (!matches || matches.length === 0) {
+      return [trimmed];
+    }
+
+    const sentences = [];
+    for (const match of matches) {
+      const s = match.trim();
+      if (s) {
+        sentences.push(s);
+      }
+    }
+    return sentences.length > 0 ? sentences : [trimmed];
+  }
+
+  /**
+   * Emergency fallback to split words across pages when a single sentence exceeds the entire page height.
+   * @param {string[]} words
+   * @param {number} safeAvailableHeight
+   * @param {boolean} [isContinuation=false]
+   * @returns {HTMLElement[]}
+   */
+  splitWordsToPages(words, safeAvailableHeight, isContinuation = false) {
+    const resultNodes = [];
+    let remWords = words;
+
+    while (remWords.length > 0) {
+      this.measurerEl.innerHTML = '';
+      const testP = document.createElement('p');
+      if (isContinuation || resultNodes.length > 0) testP.className = 'continuation';
+      this.measurerEl.appendChild(testP);
+
+      let low = 1;
+      let high = remWords.length;
+      let best = 1;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        testP.textContent = remWords.slice(0, mid).join(' ');
+        if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      const p = document.createElement('p');
+      if (isContinuation || resultNodes.length > 0) p.className = 'continuation';
+      p.textContent = remWords.slice(0, best).join(' ');
+      resultNodes.push(p);
+      remWords = remWords.slice(best);
+    }
+
+    return resultNodes;
+  }
+
+  /**
+   * Paginates an array of sentences across pages, strictly ending each page on complete sentence boundaries.
+   * Falls back to word-splitting ONLY if a single sentence exceeds the entire page height.
+   * @param {string[]} sentences
+   * @param {HTMLElement[][]} pages
+   * @param {HTMLElement[]} currentPageNodes
+   * @param {number} safeAvailableHeight
+   */
+  paginateSentences(sentences, pages, currentPageNodes, safeAvailableHeight) {
+    let remSentences = sentences;
+
+    while (remSentences.length > 0) {
+      this.measurerEl.innerHTML = '';
+      const testP = document.createElement('p');
+      testP.className = 'continuation';
+      this.measurerEl.appendChild(testP);
+
+      let fitCount = 0;
+      for (let i = 1; i <= remSentences.length; i++) {
+        testP.textContent = remSentences.slice(0, i).join(' ');
+        if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+          fitCount = i;
+        } else {
+          break;
+        }
+      }
+
+      this.measurerEl.innerHTML = '';
+
+      if (fitCount >= remSentences.length) {
+        // All remaining sentences fit on this page!
+        const finalP = document.createElement('p');
+        finalP.className = 'continuation';
+        finalP.textContent = remSentences.join(' ');
+        currentPageNodes.push(finalP);
+        this.measurerEl.appendChild(finalP.cloneNode(true));
+        break;
+      } else if (fitCount > 0) {
+        // A subset of sentences fit on this page
+        const sliceP = document.createElement('p');
+        sliceP.className = 'continuation';
+        sliceP.textContent = remSentences.slice(0, fitCount).join(' ');
+        pages.push([sliceP]);
+        remSentences = remSentences.slice(fitCount);
+      } else {
+        // Rare edge case: A single sentence exceeds the entire height of an empty page
+        const singleSentenceWords = remSentences[0].split(/\s+/).filter(Boolean);
+        const wordSlices = this.splitWordsToPages(singleSentenceWords, safeAvailableHeight, true);
+        for (let w = 0; w < wordSlices.length - 1; w++) {
+          pages.push([wordSlices[w]]);
+        }
+        const lastSlice = wordSlices[wordSlices.length - 1];
+        if (remSentences.length === 1) {
+          currentPageNodes.push(lastSlice);
+          this.measurerEl.appendChild(lastSlice.cloneNode(true));
+        } else {
+          pages.push([lastSlice]);
+        }
+        remSentences = remSentences.slice(1);
+      }
+    }
+  }
+
+  /**
    * Paginates chapter markdown into non-overflowing page slides.
    * Measures content height accurately in client DOM so NO text is ever clipped.
    * @param {string} markdown
@@ -299,79 +433,40 @@ export class VirtualCarousel {
         this.measurerEl.removeChild(node);
 
         if (node.tagName === 'P') {
-          const words = node.textContent.trim().split(/\s+/).filter(Boolean);
-          let low = 1;
-          let high = words.length;
-          let bestWords = 0;
+          const sentences = this.splitIntoSentences(node.textContent);
+          let bestSentences = 0;
 
-          const testP = document.createElement('p');
-          if (currentPageNodes.length > 0) testP.className = 'continuation';
-          this.measurerEl.appendChild(testP);
+          // If current page already has content, test how many sentences fit in remaining space
+          if (currentPageNodes.length > 0) {
+            const testP = document.createElement('p');
+            this.measurerEl.appendChild(testP);
 
-          // Binary search for exact number of words that fit remaining vertical space
-          while (low <= high) {
-            const mid = Math.floor((low + high) / 2);
-            testP.textContent = words.slice(0, mid).join(' ');
-            if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
-              bestWords = mid;
-              low = mid + 1;
-            } else {
-              high = mid - 1;
+            for (let i = 1; i <= sentences.length; i++) {
+              testP.textContent = sentences.slice(0, i).join(' ');
+              if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
+                bestSentences = i;
+              } else {
+                break;
+              }
             }
+            this.measurerEl.removeChild(testP);
           }
 
-          this.measurerEl.removeChild(testP);
-
-          if (bestWords >= 8 && currentPageNodes.length > 0) {
-            // First slice fits on current page
+          if (bestSentences > 0) {
+            // First slice of sentences fits on current page
             const fitP = document.createElement('p');
-            fitP.textContent = words.slice(0, bestWords).join(' ');
+            fitP.textContent = sentences.slice(0, bestSentences).join(' ');
             currentPageNodes.push(fitP);
 
+            // Flush current page at sentence boundary
             pages.push(currentPageNodes);
             currentPageNodes = [];
             this.measurerEl.innerHTML = '';
 
-            let remainingWords = words.slice(bestWords);
-            while (remainingWords.length > 0) {
-              this.measurerEl.innerHTML = '';
-              const contP = document.createElement('p');
-              contP.className = 'continuation';
-              this.measurerEl.appendChild(contP);
-
-              let rLow = 1;
-              let rHigh = remainingWords.length;
-              let rBest = 0;
-
-              while (rLow <= rHigh) {
-                const mid = Math.floor((rLow + rHigh) / 2);
-                contP.textContent = remainingWords.slice(0, mid).join(' ');
-                if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
-                  rBest = mid;
-                  rLow = mid + 1;
-                } else {
-                  rHigh = mid - 1;
-                }
-              }
-
-              if (rBest === 0 || rBest >= remainingWords.length) {
-                const finalP = document.createElement('p');
-                finalP.className = 'continuation';
-                finalP.textContent = remainingWords.join(' ');
-                currentPageNodes.push(finalP);
-                this.measurerEl.innerHTML = '';
-                this.measurerEl.appendChild(finalP.cloneNode(true));
-                break;
-              } else {
-                const sliceP = document.createElement('p');
-                sliceP.className = 'continuation';
-                sliceP.textContent = remainingWords.slice(0, rBest).join(' ');
-                pages.push([sliceP]);
-                remainingWords = remainingWords.slice(rBest);
-              }
-            }
+            const remainingSentences = sentences.slice(bestSentences);
+            this.paginateSentences(remainingSentences, pages, currentPageNodes, safeAvailableHeight);
           } else {
-            // Not enough space for split on current page, flush current page
+            // Not enough space for any sentence on current page; flush to start fresh page
             if (currentPageNodes.length > 0) {
               pages.push(currentPageNodes);
               currentPageNodes = [];
@@ -382,47 +477,8 @@ export class VirtualCarousel {
             if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
               currentPageNodes.push(node.cloneNode(true));
             } else {
-              // Paragraph larger than full page: split across multiple pages
               this.measurerEl.removeChild(node);
-              let remWords = words;
-
-              while (remWords.length > 0) {
-                this.measurerEl.innerHTML = '';
-                const pBlock = document.createElement('p');
-                if (pages.length > 0) pBlock.className = 'continuation';
-                this.measurerEl.appendChild(pBlock);
-
-                let bLow = 1;
-                let bHigh = remWords.length;
-                let bBest = 0;
-
-                while (bLow <= bHigh) {
-                  const mid = Math.floor((bLow + bHigh) / 2);
-                  pBlock.textContent = remWords.slice(0, mid).join(' ');
-                  if (this.measurerEl.offsetHeight <= safeAvailableHeight) {
-                    bBest = mid;
-                    bLow = mid + 1;
-                  } else {
-                    bHigh = mid - 1;
-                  }
-                }
-
-                if (bBest === 0 || bBest >= remWords.length) {
-                  const finP = document.createElement('p');
-                  if (pages.length > 0) finP.className = 'continuation';
-                  finP.textContent = remWords.join(' ');
-                  currentPageNodes.push(finP);
-                  this.measurerEl.innerHTML = '';
-                  this.measurerEl.appendChild(finP.cloneNode(true));
-                  break;
-                } else {
-                  const partP = document.createElement('p');
-                  if (pages.length > 0) partP.className = 'continuation';
-                  partP.textContent = remWords.slice(0, bBest).join(' ');
-                  pages.push([partP]);
-                  remWords = remWords.slice(bBest);
-                }
-              }
+              this.paginateSentences(sentences, pages, currentPageNodes, safeAvailableHeight);
             }
           }
         } else {
